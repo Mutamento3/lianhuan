@@ -1615,6 +1615,27 @@ h3{font-size:15.5px;font-weight:600;margin:0 0 3px;line-height:1.45}
   color:var(--hint);padding:0;display:flex;align-items:center;justify-content:center}
 .stagebar .x svg{width:14px;height:14px;stroke:currentColor;stroke-width:2;fill:none;
   stroke-linecap:round}
+/* ★ 0906 引用条：挑中一句话 → 输入框上头冒一个小泡泡（谁说的 + 那句话 + 一个叉）。
+   原来是把那句话截 60 个字塞进输入框 —— 看不出是谁说的，也没法一下删掉。
+   照上头 .stagebar .chip 长（贴图时就是这个泡泡，同一处、同一套视觉），
+   多两样：左边一道竖杠分谁说的，泡泡里第一行是名字。 */
+.qbar{padding:0 2px 8px}
+.qbar[hidden]{display:none}
+.qbar .qchip{display:flex;align-items:center;gap:8px;max-width:100%;
+  background:var(--card2);border:1px solid var(--line);border-radius:12px;
+  padding:6px 4px 6px 8px;animation:chipin .18s var(--e-out) backwards}
+.qbar .qbrand{flex:none;width:3px;align-self:stretch;border-radius:2px;background:var(--maple)}
+.qbar .qchip[data-who="me"] .qbrand{background:var(--hint)}
+.qbar .qtx{flex:1;min-width:0}
+.qbar .qwho{display:block;font-size:11.5px;font-weight:600;color:var(--ink);line-height:1.5}
+.qbar .qone{display:block;font-size:12px;line-height:1.5;color:var(--sub);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ✕ 看着小，热区撑到 44 —— 书房那条引用条就是这么干的 */
+.qbar .qx{width:28px;height:28px;flex:none;border:0;background:transparent;cursor:pointer;
+  color:var(--hint);padding:0;display:flex;align-items:center;justify-content:center;position:relative}
+.qbar .qx::after{content:'';position:absolute;top:50%;left:50%;width:44px;height:44px;
+  transform:translate(-50%,-50%)}
+.qbar .qx svg{width:15px;height:15px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}
 /* 用户发的文件名，跟在气泡里那句话下面 */
 .msg .fnames{display:block;font-style:normal;font-size:12px;line-height:1.6;opacity:.82;
   margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.28);word-break:break-all}
@@ -3476,6 +3497,16 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline-offset:1
     <!-- 0805 晚要的：能一次挑好几样，先停在这儿，配一句话再一起发（像 TG）。
          原来是单张一个位置，现在横着排，每个能单独撤掉。 -->
     <div class="stagebar" id="stagebar" hidden></div>
+    <!-- 0906 引用：挑中上头某一句 → 这儿冒一个小泡泡（谁说的 + 那句话 + 一个叉） -->
+    <div class="qbar" id="qbar" hidden>
+      <div class="qchip">
+        <i class="qbrand"></i>
+        <span class="qtx"><b class="qwho"></b><span class="qone"></span></span>
+        <button class="qx" aria-label="不引用了">
+          <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
     <!-- 两个入口分开：相册那个只收图（accept 带 image/* 手机才会给相册），文件那个什么都收。
          multiple 是点名要的的。 -->
     <input type="file" id="picpick" accept="image/*" multiple hidden>
@@ -5954,6 +5985,48 @@ const PREF = (function(){
     }
   });
 
+  /* ── ★ 0906 引用条 ────────────────────────────────────────────────
+     ★ 名字**不存进引用里**，每次画的时候现取 —— 谁在设置里改了昵称，
+       泡泡上的名字跟着就变。 */
+  var QUOTE = null;                                /* {cid, who:'qf'|'me', text} */
+  function quoteName(who){
+    if (who === 'me') return '我';
+    var n = document.getElementById('myname');
+    return (n && n.textContent.trim()) || '他';
+  }
+  function drawQuote(){
+    var bar = document.getElementById('qbar'); if (!bar) return;
+    if (!QUOTE){ bar.hidden = true; return; }
+    bar.hidden = false;
+    bar.querySelector('.qchip').setAttribute('data-who', QUOTE.who);
+    bar.querySelector('.qwho').textContent = quoteName(QUOTE.who);
+    bar.querySelector('.qone').textContent = QUOTE.text;
+  }
+  window.setChatQuote = function(el){
+    if (!el){ toast('没认出是哪一句'); return; }
+    /* 气泡里可能还挂着图和文件名，压成一行 —— 泡泡上只放一行 */
+    var t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!t){ toast('这条没有字，引不了'); return; }
+    QUOTE = {cid: (el.dataset && el.dataset.cid) || '',
+             who: el.classList.contains('me') ? 'me' : 'qf',
+             text: t};
+    drawQuote();
+    var ta = document.getElementById('ta'); if (ta) ta.focus();
+  };
+  window.putChatQuote   = function(q){ QUOTE = q || null; drawQuote(); };   /* 没发出去时还回来 */
+  window.clearChatQuote = function(){ QUOTE = null; drawQuote(); };
+  window.takeChatQuote  = function(){ var q = QUOTE; QUOTE = null; drawQuote(); return q; };
+  (function(){
+    var bar = document.getElementById('qbar'); if (!bar) return;
+    bar.querySelector('.qx').addEventListener('click', function(){ window.clearChatQuote(); });
+    /* 设置里把名字改了 → 泡泡上那个名字立刻跟着改 */
+    var nm = document.getElementById('myname');
+    if (nm && window.MutationObserver){
+      new MutationObserver(function(){ if (QUOTE) drawQuote(); })
+        .observe(nm, {childList: true, characterData: true, subtree: true});
+    }
+  })();
+
   var popm = document.getElementById('popmenu');
   /* 0807：这张菜单现在有两个来路 —— 长按某一条（popm._msg），或者最后一条底下那颗「更多」（popm._for）。
      所有动作统一问这一个函数「你要动的是哪一条」，别再各自去 closest('.acts')。 */
@@ -6017,15 +6090,9 @@ const PREF = (function(){
         toast('重说了一遍');
       });
     }
-    if (m === 'quote'){
-      var _ta = document.getElementById('ta');
-      if (_txt && _ta){
-        _ta.value = (_txt.length > 60 ? _txt.slice(0, 60) + '…' : _txt) + '\n';
-        _ta.focus();
-        try { _ta.setSelectionRange(_ta.value.length, _ta.value.length); } catch(e){}
-        toast('带进来了，接着说');
-      }
-    }
+    /* ★ 0906 改：原来是把那句话截 60 个字塞进输入框（要一个字一个字删，
+       而且发出去以后谁也看不出那是引用）。现在挑中就在输入框上头挂一个小泡泡。 */
+    if (m === 'quote'){ window.setChatQuote(_el); }
     if (m === 'pick')  { setPicking(true); toast('点气泡挑，挑完存成长图'); }
     if (m === 'hide')  {
       var msg = popMsgEl();
@@ -6065,9 +6132,50 @@ const PREF = (function(){
       sc.src = '/html2canvas.min.js';
       sc.onload  = function(){ window.html2canvas ? res(window.html2canvas) : rej(new Error('脚本空的')); };
       sc.onerror = function(){ _h2c = null; rej(new Error('拉不到出图脚本')); };
+      /* ★ 0906 有人报「点了存长图就一直停在『出图…』」。script 标签有一种挂法是
+         onload / onerror 一个都不来（网络半死不活时），那样这条 promise 永远悬着，
+         按钮再也变不回来。给它一道 25 秒的闸，超了当拉不到处理，至少能报错、能再点一次。 */
+      setTimeout(function(){
+        if (!window.html2canvas){ _h2c = null; rej(new Error('出图脚本拉太久')); }
+      }, 25000);
       document.head.appendChild(sc);
     });
     return _h2c;
+  }
+  /* ★ 0906 出图的最后一步：把画布变成一个文件。原来是干等
+     `cv.toBlob(res,'image/png')` —— 两个坑：
+       ① iOS Safari 上画布一大，toBlob 有时**根本不回调**（不是给 null，是没声音）。
+          没有兜底的话 promise 就永远 pending，按钮永远停在「出图…」。
+       ② PNG 存长图又大又费内存，正是把 Safari 逼到那一步的原因；
+          而且大 PNG 在 iOS 的分享面板里常常转圈转到没有「存储到图片」这一项。
+     所以：先按 JPEG 走 toBlob，6 秒没回话就改走 toDataURL（同步的，不吃这个坑）。 */
+  function dataURLBlob(du){
+    var i = String(du).indexOf(','); if (i < 0) return null;
+    var head = du.slice(0, i), body = du.slice(i + 1);
+    var mime = (head.match(/data:([^;,]+)/) || [])[1] || 'image/jpeg';
+    var bin = atob(body), n = bin.length, u8 = new Uint8Array(n);
+    while (n--) u8[n] = bin.charCodeAt(n);
+    return new Blob([u8], {type: mime});
+  }
+  function canvasBlob(cv){
+    return new Promise(function(res){
+      var done = false;
+      var fin = function(b){ if (done) return; done = true; res(b || null); };
+      var fallback = function(){
+        try { fin(dataURLBlob(cv.toDataURL('image/jpeg', 0.92))); }
+        catch(e){ console.warn('[shot] toDataURL 也没成', e); fin(null); }
+      };
+      var timer = setTimeout(function(){
+        console.warn('[shot] toBlob 没回话，改走 toDataURL');
+        fallback();
+      }, 6000);
+      try {
+        cv.toBlob(function(b){
+          clearTimeout(timer);
+          if (b) fin(b); else fallback();      /* 给了 null 也退回去，别直接报「出图是空的」 */
+        }, 'image/jpeg', 0.92);
+      } catch(e){ clearTimeout(timer); fallback(); }
+    });
   }
   function showShot(blob){
     var url = URL.createObjectURL(blob);
@@ -6082,7 +6190,7 @@ const PREF = (function(){
     var tip = document.createElement('div');
     tip.className = 'shotbye';
     var dl = document.createElement('a');
-    dl.className = 'shotdl'; dl.href = url; dl.download = '连环_' + Date.now() + '.png';
+    dl.className = 'shotdl'; dl.href = url; dl.download = '连环_' + Date.now() + '.jpg';
     dl.textContent = '下载';
     dl.addEventListener('click', function(e){ e.stopPropagation(); });
     row.appendChild(tip);
@@ -6092,7 +6200,9 @@ const PREF = (function(){
        菜单里常常根本没有「存储到照片」。所以走系统的分享面板，那里头是有的。
        不支持的浏览器就不长这颗键，老的长按和下载一个没动。 */
     var f = null;
-    try { f = new File([blob], '连环_' + Date.now() + '.png', {type: 'image/png'}); } catch(e){}
+    /* ★ 0906 文件名走 ASCII：iOS 的分享面板遇上中文名时灵时不灵，
+       面板里那条「存储到图片」有时候就是不长出来。下载键那边照旧用中文名，不受影响。 */
+    try { f = new File([blob], 'lianhuan-' + Date.now() + '.jpg', {type: blob.type || 'image/jpeg'}); } catch(e){}
     var canShare = !!(f && navigator.share && navigator.canShare
                       && navigator.canShare({files: [f]}));
     if (canShare){
@@ -6108,8 +6218,21 @@ const PREF = (function(){
       });
       row.appendChild(sv);
     }
-    tip.textContent = canShare ? '按「存到相册」· 点旁边关掉'
-                               : '长按图片存到相册 · 点旁边关掉';
+    /* ★ 0906 分享面板不给「存储到图片」的时候，之前就没有第二条路了
+       （下载键在 PWA 里不落地，长按 blob: 图在 standalone 里也常常没有「存储到照片」）。
+       所以再多一颗：把这张图**单独开成一页**。到了那一页它就是一张普通图片，
+       长按一定有「存储到照片」；PWA 里这一下会跳去浏览器，那正好，浏览器里最稳。 */
+    var op = document.createElement('button');
+    op.className = 'shotdl';
+    op.textContent = '单独打开';
+    op.addEventListener('click', function(e){
+      e.stopPropagation();
+      var w = window.open(url, '_blank');
+      if (!w) toast('浏览器拦了新窗口 —— 那就长按上面这张图存相册');
+    });
+    row.appendChild(op);
+    tip.textContent = canShare ? '按「存到相册」；没给你存图选项就点「单独打开」'
+                               : '长按图片存相册，或点「单独打开」';
     row.appendChild(dl);
     card.appendChild(im); card.appendChild(row);
     ov.appendChild(card);
@@ -6209,6 +6332,34 @@ const PREF = (function(){
         }
       });
       document.body.appendChild(wrap);
+      /* ★ 0906 出图有可能整条抛 `unsupported color function "color"`，一张都出不来。
+         起因：CSS 里只要用了 `color-mix()`，浏览器算完交出来的是
+         **`color(srgb 0.98 0.93 0.92)`** 这种 CSS Color 4 写法，而 html2canvas 1.4.1
+         （2022 年的版本）只认 rgb / rgba / hsl / #hex，一撞上就抛。
+         升 html2canvas 会牵动一大片，这儿只做一件小事：把**离屏这份马上要丢掉的克隆**里
+         所有 `color(srgb …)` 就地换算成 `rgb()/rgba()` —— 纯乘 255，颜色一模一样。
+         页面本身一个字节没动。换算失败也不拦着出图。 */
+      (function(){
+        var re = /color\(\s*srgb\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s+([\d.eE+-]+)\s*(?:\/\s*([\d.eE+-]+%?)\s*)?\)/g;
+        var to255 = function(x){ return Math.max(0, Math.min(255, Math.round(parseFloat(x) * 255))); };
+        var fix = function(v){
+          return v.replace(re, function(_, r, g, b, a){
+            var body = to255(r) + ', ' + to255(g) + ', ' + to255(b);
+            if (a == null || a === '') return 'rgb(' + body + ')';
+            return 'rgba(' + body + ', ' + (/%$/.test(a) ? parseFloat(a) / 100 : parseFloat(a)) + ')';
+          });
+        };
+        try {
+          var els = [wrap].concat([].slice.call(wrap.querySelectorAll('*')));
+          els.forEach(function(el){
+            var cs = getComputedStyle(el);
+            for (var i = 0; i < cs.length; i++){
+              var k = cs[i], v = cs.getPropertyValue(k);
+              if (v && v.indexOf('color(') >= 0) el.style.setProperty(k, fix(v));
+            }
+          });
+        } catch(e){ console.warn('[shot] 颜色换算跳过', e); }
+      })();
       /* ★ 0829：iOS 的画布有面积上限（约 1670 万像素），选得多、图很长的时候
          scale:2 一乘就超了，`toBlob` 会直接给 null —— 屏幕上看到的是「出图是空的」。
          所以按实际长宽反算一个够用的倍数，宁可细节糙一点，也别出不来。 */
@@ -6219,7 +6370,7 @@ const PREF = (function(){
       return h2c(wrap, {backgroundColor: bg, scale: _sc, logging: false, useCORS: true})
         .then(function(cv){
           wrap.remove();
-          return new Promise(function(res){ cv.toBlob(res, 'image/png'); });
+          return canvasBlob(cv);
         }, function(err){ wrap.remove(); throw err; });
     }).then(function(blob){
       if (!blob) throw new Error('出图是空的');
@@ -14287,11 +14438,16 @@ window.haptic = haptic;
       /* ★ 告诉他这些东西躺在服务器哪儿 —— 他要用 Read 亲眼看，不是听我转述。
          这段〔〕在原项目是不进聊天记录的旁白。 */
       const note = attachNote(ups, !!t);
-      CHAT.send(t ? (note + '\n' + t) : note, {voice_feel: takeFeel()}, {echo: false});
+      /* 0906 引用：跟着这条一起递过去，发不出去就还回来（别让人重挑一遍） */
+      const _q1 = window.takeChatQuote && window.takeChatQuote();
+      CHAT.send(t ? (note + '\n' + t) : note, {voice_feel: takeFeel(), quote: _q1}, {echo: false})
+        .then(function(ok){ if (!ok && _q1 && window.putChatQuote) window.putChatQuote(_q1); });
       return;
     }
     /* voice_feel：用户刚才是对着麦克风说的，把「声音听上去怎么样」一起递给他 */
-    CHAT.send(t, {voice_feel: takeFeel()});
+    const _q2 = window.takeChatQuote && window.takeChatQuote();
+    CHAT.send(t, {voice_feel: takeFeel(), quote: _q2})
+      .then(function(ok){ if (!ok && _q2 && window.putChatQuote) window.putChatQuote(_q2); });
   }
   send.addEventListener('click', go);
   /* ★ 0810 翻案：回车＝换行，⌘/Ctrl+回车＝发送 —— 回车发送太容易把半句话推出去。
