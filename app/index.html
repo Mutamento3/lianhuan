@@ -1159,6 +1159,23 @@ h3{font-size:15.5px;font-weight:600;margin:0 0 3px;line-height:1.45}
   font-size:11.5px;color:var(--hint);opacity:.85;
   font-variant-numeric:tabular-nums;letter-spacing:.02em;
 }
+/* ★ 0906 气泡里的引用块：引用在气泡**里头**、正文上头，一道竖线加半透明，
+   跟正文分得开。用 currentColor＋opacity：自己那边深底白字、对方那边白底深字，
+   同一套写法两边都合适。 */
+.msg .qref{
+  display:block;border-left:2px solid currentColor;padding-left:8px;
+  margin:0 0 7px;opacity:.55;font-size:12.5px;line-height:1.55;
+  word-break:break-word;
+}
+.msg .qref b{display:block;font-weight:600;font-size:11.5px;margin-bottom:1px;opacity:.9}
+/* ★ 0906 长图专用的那行时间。屏幕上对方那边的时间挂在那排键里，
+   而那排键一轮只挂最后一条（moveActs 的规矩）—— 中间的泡泡屏幕上本来就没有时间，
+   照搬进长图自然也没有。长图里每条都补一行，样子照 .metime，只是靠左。 */
+.shottime{
+  text-align:left;margin:-9px 0 16px 3px;
+  font-size:11.5px;color:var(--hint);opacity:.85;
+  font-variant-numeric:tabular-nums;letter-spacing:.02em;
+}
 /* 来路标：QQ 说的 / 电话里说的。用户 0818 点的两个颜文字，原项目也有这一格（index.html:778） */
 .srcmark{
   font-size:11px;color:var(--hint);opacity:.9;letter-spacing:.5px;
@@ -6004,8 +6021,13 @@ const PREF = (function(){
   }
   window.setChatQuote = function(el){
     if (!el){ toast('没认出是哪一句'); return; }
-    /* 气泡里可能还挂着图和文件名，压成一行 —— 泡泡上只放一行 */
-    var t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+    /* 气泡里可能还挂着图和文件名，压成一行 —— 泡泡上只放一行。
+       ★ 0906 先把气泡里那块 .qref 摘掉再取字：那是**上一层**的引用，
+         不摘的话引用一条带引用的话就会把上一层的字也吞进来，滚几轮变套娃。 */
+    var _c = el.cloneNode(true);
+    var _qr = _c.querySelector && _c.querySelector('.qref');
+    if (_qr) _qr.remove();
+    var t = (_c.textContent || '').replace(/\s+/g, ' ').trim();
     if (!t){ toast('这条没有字，引不了'); return; }
     QUOTE = {cid: (el.dataset && el.dataset.cid) || '',
              who: el.classList.contains('me') ? 'me' : 'qf',
@@ -6319,7 +6341,7 @@ const PREF = (function(){
         c.classList.remove('picked', 'gone', 'streaming');
         wrap.appendChild(c);
         /* 底下贴着的那几件一并搬走，顺序照屏幕上的来 */
-        var nx = m.nextElementSibling;
+        var nx = m.nextElementSibling, gotTime = false;
         while (nx && nx.classList
                && (nx.classList.contains('acts') || nx.classList.contains('metime')
                    || nx.classList.contains('toolnote'))){
@@ -6327,8 +6349,26 @@ const PREF = (function(){
           k.classList.remove('gone');
           var pl = k.querySelector && k.querySelector('.playing');   /* 正念着的那颗别定格成亮的 */
           if (pl) pl.classList.remove('playing');
+          /* 这一条有没有把时间带出来：自己那边是 .metime 那一行，对方那边是那排键里的 <time> */
+          if (k.classList.contains('metime')) gotTime = true;
+          var _tm = k.querySelector && k.querySelector('time');
+          if (_tm && _tm.textContent.trim()) gotTime = true;
           wrap.appendChild(k);
           nx = nx.nextElementSibling;
+        }
+        /* ★ 0906 长图里「左边泡泡没有时间，只有右边有」。
+           时间本身每条气泡身上都有（data-ts），缺的只是**显示**：
+           自己那边的话底下单挂一行 .metime，条条都有；对方的话时间在那排键里，
+           而那排键一轮只挂最后一条 —— 中间那些屏幕上就没有。这儿按 data-ts 补上。 */
+        if (!gotTime){
+          var _ts = Number((m.dataset && m.dataset.ts) || 0);
+          if (_ts){
+            var tl = document.createElement('div');
+            tl.className = m.classList.contains('me') ? 'metime' : 'shottime';
+            tl.textContent = window.fmtTS ? window.fmtTS(_ts)
+                           : new Date(_ts).toTimeString().slice(0, 5);
+            wrap.appendChild(tl);
+          }
         }
       });
       document.body.appendChild(wrap);
@@ -13725,6 +13765,29 @@ window.haptic = haptic;
     const hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
     return d.toDateString() === n.toDateString() ? hm : ((d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hm);
   };
+  window.fmtTS = fmtTS;        /* 0906 出图那段在另一个闭包里，借这一个用，别各写一份 */
+  /* ★ 0906 引用要进聊天记录（两边都看得到，翻历史也在）。
+     做法：把引用拼成正文的**第一行**，跟着这条消息一起落库 —— 库的结构一个字没动，
+     翻历史、备份、记忆蒸馏、读上下文，全都自动带着它。格式人和模型都直接读得懂：
+         ▎引用他说的：闹吗
+         闹吗。
+     ★ 「他／我」是**发这条的人的视角**；名字不写死在里头 —— 画的时候现取当前昵称，
+       所以改了名字，翻出来的老记录也跟着变。
+     ★ 老消息没有这一行，走的还是原来那条路，一个字不受影响。 */
+  const QREF_RE = /^▎引用(他|我)说的：([^\n]*)\n?/;
+  function quoteMark(q){
+    if (!q || !q.text) return '';
+    return '▎引用' + (q.who === 'me' ? '我' : '他') + '说的：'
+         + String(q.text).replace(/\s+/g, ' ').trim() + '\n';
+  }
+  function qrefHTML(whoCN, quoted){
+    let nm = '我';
+    if (whoCN === '他'){
+      const n = document.getElementById('myname');
+      nm = (n && n.textContent.trim()) || '他';
+    }
+    return '<span class="qref"><b>' + esc(nm) + '</b>' + esc(quoted) + '</span>';
+  }
   let _sep = 0;
   function maybeSep(ms){
     if (!ms || ms - _sep <= 8 * 60000){ if (ms) _sep = ms; return; }
@@ -13865,7 +13928,13 @@ window.haptic = haptic;
     d.className = 'msg ' + (side === 'me' ? 'me' : 'him');
     d.dataset.ts = String(at);          /* 那排键上的时间从这儿取（moveActs） */
     if (src) d.dataset.src = src;       /* 来路：qq / call / proactive…（moveActs 也读它） */
-    d.innerHTML = linkify(text);        /* linkify 自带转义，不会漏 HTML 进来 */
+    /* ★ 0906 引用：第一行 `▎引用他说的：…` 是跟着这条消息一起落库的引用
+       （见上面 quoteMark 那段的说明）。画成气泡里的浅色块，正文照旧。
+       ★ 名字**现取**，不是存在库里的 —— 改了昵称，翻出来的老记录也跟着变。
+       ★ 没有这一行的老消息一个字不受影响。 */
+    const qm = String(text || '').match(QREF_RE);
+    if (qm) text = String(text).slice(qm[0].length);
+    d.innerHTML = (qm ? qrefHTML(qm[1], qm[2]) : '') + linkify(text);
     wrap.appendChild(d);
     /* 用户自己那句底下没有那排键，时间单挂一行贴着 */
     if (side === 'me'){
@@ -14438,15 +14507,16 @@ window.haptic = haptic;
       /* ★ 告诉他这些东西躺在服务器哪儿 —— 他要用 Read 亲眼看，不是听我转述。
          这段〔〕在原项目是不进聊天记录的旁白。 */
       const note = attachNote(ups, !!t);
-      /* 0906 引用：跟着这条一起递过去，发不出去就还回来（别让人重挑一遍） */
+      /* 0906 引用：拼成正文第一行一起发走，发不出去就把泡泡还回来（别让人重挑一遍） */
       const _q1 = window.takeChatQuote && window.takeChatQuote();
-      CHAT.send(t ? (note + '\n' + t) : note, {voice_feel: takeFeel(), quote: _q1}, {echo: false})
+      const _b1 = t ? (note + '\n' + t) : note;
+      CHAT.send(quoteMark(_q1) + _b1, {voice_feel: takeFeel()}, {echo: false})
         .then(function(ok){ if (!ok && _q1 && window.putChatQuote) window.putChatQuote(_q1); });
       return;
     }
     /* voice_feel：用户刚才是对着麦克风说的，把「声音听上去怎么样」一起递给他 */
     const _q2 = window.takeChatQuote && window.takeChatQuote();
-    CHAT.send(t, {voice_feel: takeFeel(), quote: _q2})
+    CHAT.send(quoteMark(_q2) + t, {voice_feel: takeFeel()})
       .then(function(ok){ if (!ok && _q2 && window.putChatQuote) window.putChatQuote(_q2); });
   }
   send.addEventListener('click', go);
