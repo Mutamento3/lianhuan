@@ -351,7 +351,19 @@ async def chat(req: Request):
     history = [{"role": t.role, "content": t.content}
                for t in store.context_turns(channel=channel, call_id=call_id,
                                             limit=25, exclude_id=uid)]
-    turn = EngineTurn(message=msg, system=system, history=history, session_id=session_id)
+    # (0906) 引用:对方在聊天里挑了上头某一句再说话——把那句原样递过去,
+    #        别让引擎去猜"这句"指的是哪句。前端传 {who:'qf'|'me', text, cid},
+    #        **名字不传**:昵称随时能改,记死在这儿反而会错。
+    #        ★ 只加在给引擎的那一份上,落库的仍是对方打的原话(上面 add_turn 已经落过了)。
+    msg_for_engine = msg
+    _qz = body.get("quote")
+    if isinstance(_qz, dict):
+        _qt = str(_qz.get("text") or "").strip()[:400]
+        if _qt:
+            _qw = "你自己早先说的" if _qz.get("who") == "qf" else "对方自己早先说的"
+            msg_for_engine += ("\n〔这句是**引用着**" + _qw + "那一句说的。被引的原句:「" + _qt +
+                               "」。下面这句话是冲着它来的,先对准它再回,别当成新起的话头。〕")
+    turn = EngineTurn(message=msg_for_engine, system=system, history=history, session_id=session_id)
 
     job = jobs.new(msg)
     gen_at_start = getattr(store, "generation", 0)      # 这一轮开始时的档案世代
