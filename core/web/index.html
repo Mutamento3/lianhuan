@@ -5295,6 +5295,12 @@ const PREF = (function(){
     sscrim.style.transition = smooth ? '' : 'none';
     sscrim.style.opacity = Math.max(0, (CLOSED - pct) / CLOSED * 0.92).toFixed(3);
     sscrim.style.pointerEvents = pct >= CLOSED ? 'none' : 'auto';
+    /* ★ 0907 早上 · 这张 sheet 一直只靠行内 style 开合，从不带 .on ——
+       返回桥判断「这张 sheet 开着没」看的就是配套 scrim 的 .on，于是**永远看不见它**，
+       0905 那次「给三张 sheet 补上返回」对这一张其实没生效。
+       ★ 补这个 class 不改任何视觉：.scrim.on 是 opacity:1，而上面两行是行内样式，优先级更高，
+         渐变、跟手拖动、三档吸附全都照旧归 setSheet 管。 */
+    sscrim.classList.toggle('on', pct < CLOSED);
     chev.style.transform = pct >= CLOSED ? '' : 'rotate(90deg)';
   }
   function sheetOpen(v){ setSheet(v ? SNAP[1] : CLOSED, true); }
@@ -17402,9 +17408,26 @@ async function loadHome(){
 (function(){
   'use strict';
   if (window.__backBridge) return;      /* 别装两遍 */
-  window.__backBridge = 2;
+  window.__backBridge = 3;
 
+  /* ★★ 0907 · 第三版。症状：从子页退出来再点开心情，左滑返回会整页刷新（回到开屏）。
+     实测复现了，而且是两个洞叠在一起：
+
+     洞一：**哨兵只有一个**。popstate 是异步的 —— 连着两次 back 打进来时，
+       第二次已经把唯一那个哨兵吃掉了，pin() 才轮到跑。iOS 侧滑一次手势完全可能发两次。
+       本地实测：间隔 600ms 的三次返回全被拦住 ✅；**同步连发三次，当场穿出去** ❌。
+       → 改成身后常备 DEPTH 层，每次 popstate 补回满。要连发六次才穿得过去。
+
+     洞二：见 closeTop 里那段。**sc.click() 之后直接 return true，没回头确认真关上了。**
+
+     ★ 顺手加的两条保险：
+       · burst：150ms 内的第二次 popstate 只补哨兵、不再多关一层
+         （一次手势发两次 back，不该把两层都关掉）
+       · pageshow：iOS 从 bfcache 恢复时 popstate 不一定补得上，回来先补满 */
   var SEL = '.sub.on, .drawer.on';
+  /* 身后常备几层哨兵。5 层实测还会被一次滑动穿过去（一次手势可能被合并成跳好几格），加到 20。
+     在 app 和加到主屏的 PWA 里没有代价；纯浏览器标签页里想退出去要多按几下。 */
+  var DEPTH = 20;
   var order = [];                        /* 见过的打开顺序，用来挑「最上面那一层」 */
 
   function layers(){
@@ -17443,10 +17466,20 @@ async function loadHome(){
       if (scrim){ scrim.click(); return true; }
     }
     /* ★ (0905) sheet 关法：点它自己那张 scrim —— 各家 open(false) 都挂在这上头，
-       动画、落点、清理照原样跑，这儿不碰任何一家的内部。 */
+       动画、落点、清理照原样跑，这儿不碰任何一家的内部。
+       ★★ (0907) 但**不能盲信**：遮罩上不一定接了 click，
+          0905 这儿点完就 return true，等于「以为关掉了」而其实没关。
+          现在点完回头看一眼，没关掉就退到它自己那颗关闭键。 */
     if (top.classList.contains('sheet')){
       var sc = top.previousElementSibling;
-      if (sc && sc.classList && sc.classList.contains('on')){ sc.click(); return true; }
+      if (sc && sc.classList && sc.classList.contains('on')){
+        sc.click();
+        if (!sc.classList.contains('on')) return true;     /* 真关掉了 */
+        var x = top.querySelector('.sheethead .iconbtn, [id$="close"]');
+        if (x){ x.click(); return true; }
+        sc.classList.remove('on');                          /* 再兜一层，不是主路 */
+        return true;
+      }
     }
     var btn = top.id && document.querySelector('[data-close="' + top.id + '"]');
     if (btn){ btn.click(); return true; }
@@ -17454,17 +17487,30 @@ async function loadHome(){
     return true;
   }
 
-  function pin(){                        /* 身后永远留一个哨兵 */
-    try { history.pushState({ lh: 1 }, ''); } catch(e){}
+  /* state.lh = 「身后第几层哨兵」，永远是 1..DEPTH。
+     不用计数器是因为 pushState 会截断前进历史 —— 用绝对层号，补几个一目了然。 */
+  function pinTo(target){
+    var k = (history.state && history.state.lh) || 0;
+    while (k < target){
+      k++;
+      try { history.pushState({ lh: k }, ''); } catch(e){ break; }
+    }
   }
 
-  try { history.replaceState({ lh: 1 }, ''); } catch(e){}
-  pin();
+  try { history.replaceState({ lh: 0 }, ''); } catch(e){}
+  pinTo(DEPTH);
 
+  var lastPop = 0;
   window.addEventListener('popstate', function(){
-    pin();                               /* ★ 先补哨兵：无论下面发生什么，都不会走出这一页 */
+    var now = Date.now(), burst = (now - lastPop) < 150;
+    lastPop = now;
+    pinTo(DEPTH);                        /* ★ 先补满：无论下面发生什么，都不会走出这一页 */
+    if (burst) return;                   /* 一次手势发了两次 back —— 只补哨兵，别把两层都关了 */
     closeTop();                          /* 有层就关一层；没有就什么都不做（到根了，app 就该这样） */
   });
+
+  /* iOS 从 bfcache 把这一页恢复回来时，前面那些哨兵不一定还算数 —— 回来先补满 */
+  window.addEventListener('pageshow', function(e){ if (e.persisted) pinTo(DEPTH); });
 })();
 </script>
 
