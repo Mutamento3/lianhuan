@@ -30,7 +30,7 @@ const RUNTIME_PACKAGES = ["micropip", "sqlite3", "httpx", "anyio", "sniffio", "t
 
 await rm(dist, { recursive: true, force: true });
 await mkdir(join(dist, "wheels"), { recursive: true });
-for (const f of ["index.html", "html2canvas.min.js", "manifest.json"]) await cp(join(src, f), join(dist, f));
+for (const f of ["index.html", "html2canvas.min.js", "mini-player.js", "manifest.json"]) await cp(join(src, f), join(dist, f));
 await cp(join(src, "icons"), join(dist, "icons"), { recursive: true, filter: keep });
 await mkdir(join(dist, "blocks", "water"), { recursive: true });
 await cp(join(repo, "blocks", "water", "maple-water.js"), join(dist, "blocks", "water", "maple-water.js"));
@@ -56,7 +56,7 @@ for (const [name, ver] of WHEELS) {
 /* ── 后端：core/ optional/ seed/ 打成 zip（不带 index.html 那 1MB、不带备份和缓存） ── */
 execFileSync("zip", ["-qr", join(dist, "backend.zip"), "core", "optional", "seed",
   "-x", "*/__pycache__/*", "*.pyc", "*.bak*", "*/node_modules/*", "*.DS_Store",
-  "core/web/index.html", "core/web/html2canvas.min.js"], { cwd: repo });
+  "core/web/index.html", "core/web/html2canvas.min.js", "core/web/mini-player.js"], { cwd: repo });
 
 /* ── index.html：跟 preview 一样的补壳与改路径，但保留 sw 注册和 manifest ── */
 let html = await readFile(join(dist, "index.html"), "utf8");
@@ -83,6 +83,7 @@ swap("颜文字样式表", '<link rel="stylesheet" href="/kaomoji/vendor/styles.
 swap("manifest 链接", 'href="/manifest.json"', 'href="manifest.json"', 1);
 swap("图标路径", 'href="/icons/', 'href="icons/', 2);
 swap("出图脚本路径", "sc.src = '/html2canvas.min.js';", "sc.src = 'html2canvas.min.js';", 1);
+swap("悬浮歌条脚本路径", '<script src="/mini-player.js"></script>', '<script src="mini-player.js"></script>', 1);
 swap("开屏水面脚本路径", "load('/blocks/water/maple-water.js?v='", "load('blocks/water/maple-water.js?v='", 1);
 
 /* ★ CSP：把「这个源上只跑自己的脚本」写死。

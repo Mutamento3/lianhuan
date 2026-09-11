@@ -24,7 +24,7 @@ function keep(p) {
 /* ── 1. 白名单拷贝 ── */
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
-for (const f of ["index.html", "html2canvas.min.js"]) await cp(join(src, f), join(dist, f));
+for (const f of ["index.html", "html2canvas.min.js", "mini-player.js"]) await cp(join(src, f), join(dist, f));
 await cp(join(src, "icons"), join(dist, "icons"), { recursive: true, filter: keep });
 await cp(join(here, "banner.js"), join(dist, "banner.js"));
 /* 开屏那层水是从积木层拉的（blocks/water/，MIT），index.html 里是站根绝对路径。
@@ -85,6 +85,7 @@ if (html.includes("serviceWorker.register(")) throw new Error("还剩没换掉�
 swap("manifest 链接", '<link rel="manifest" href="/manifest.json">\n', "", 1);
 swap("图标路径", 'href="/icons/', 'href="icons/', 2);
 swap("出图脚本路径", "sc.src = '/html2canvas.min.js';", "sc.src = 'html2canvas.min.js';", 1);
+swap("悬浮歌条脚本路径", '<script src="/mini-player.js"></script>', '<script src="mini-player.js"></script>', 1);
 swap("开屏水面脚本路径", "load('/blocks/water/maple-water.js?v='", "load('blocks/water/maple-water.js?v='", 1);
 
 /* ── 3. 简单解析一遍，确认标签配平 ── */

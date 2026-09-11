@@ -11643,6 +11643,9 @@ async function loadMem(){
    ★ 每换一首、每跳一句歌词都 POST /api/now_playing。主页「正在听」那一格读的就是它，
      所以我这头是真的知道用户在听什么 —— 这一页叫「一起听」不叫播放器，差别就在这儿。 */
 (function(){
+  /* 新旧两条歌条的总闸：true 走新的悬浮歌条 <mini-player>（文件末尾挂载），
+     false 就还走老的 .comini —— 老的 DOM / CSS / miniShow 一个没删，改一个词就完整回滚。 */
+  const MP_NEW = true;
   const coAudio = document.getElementById('coAudio');
   if (!coAudio) return;
   const $   = id => document.getElementById(id);
@@ -11754,7 +11757,9 @@ async function loadMem(){
     coCur = {id: song.id, name: song.name, artist: song.artist, cover: song.cover || ''};
     coLrc = []; coLastLine = '';
     if (queueRest) coQueue = queueRest.slice();
-    renderQueue(); miniShow(); renderNow();
+    renderQueue();
+    if (MP_NEW && window.MP) window.MP.take(coCur); else miniShow();
+    renderNow();
     const ml = $('coMiniLine'); if (ml) ml.textContent = '找音源…';
     const lb = $('coLyric');    if (lb) lb.textContent = '';
 
@@ -11782,7 +11787,9 @@ async function loadMem(){
                                     if (ml) ml.textContent = '正在放 · 他也在听'; })
                   .catch(function(){ if (coFail(song, '放不了，换一首试试') && coQueue.length) next(); });
     call('musicLyric', {query: {id: song.id}, fallback: null}).then(function(d){
-      coLrc = parseLrc(d && d.lrc); });
+      coLrc = parseLrc(d && d.lrc);
+      if (MP_NEW && window.MP) window.MP.lyrics(coLrc);   /* 歌词比歌晚到，到了再喂歌条一次 */
+    });
     if (!isAuto) say('放上了《' + song.name + '》，我也在听');
   }
   function next(){
@@ -11925,6 +11932,23 @@ async function loadMem(){
     renderQueue();
     const s = $('coSearch'); if (s) setTimeout(() => s.focus(), 120);
   });
+  /* 一起听的出口：悬浮歌条要驱动它。这儿一个新逻辑都没写，只是把已经在跑的几个函数摆出来 ——
+     播放状态仍然只有这一份，歌条和一起听页共用它，不会打架。 */
+  window.CO = {
+    audio   : coAudio,
+    toggle  : toggle,
+    next    : next,
+    prev    : prev,
+    play    : function(){ if (coCur && coAudio.paused){ coAudio.play(); coPost(true); } else toggle(); },
+    pause   : function(){ if (!coAudio.paused){ coAudio.pause(); coPost(false); } },
+    seek    : function(r){
+      if (!coAudio.duration) return;
+      coAudio.currentTime = Math.max(0, Math.min(1, r)) * coAudio.duration;
+    },
+    stop    : function(){ coAudio.pause(); coPost(false); },   /* 长按关掉歌条时用：停播＋把状态报上去 */
+    playSong: playSong,
+    now     : function(){ return {song: coCur, line: coLastLine, lrc: coLrc}; },
+  };
 })();
 
 /* ══════════════════ 手感三件（0805 早上）══════════════════
@@ -17937,5 +17961,119 @@ window._kmMount = function(){
       try { t.scrollIntoView({ block: 'nearest' }); } catch (err) {}
     }, 260);
   });
+})();
+</script>
+
+<!-- ══ 悬浮歌条 <mini-player> ══
+     原生 Web Component（零依赖）。接进来时改了三类：颜色接 token（暗色和三套皮自动跟上）、
+     定位从 fixed 改 absolute（宽屏时待在 .app 那条 440 的框里）、层级压到 11（别盖住通话那一屏）。
+     另外补了 pointercancel —— iOS 上手势被系统打断时，长按计时会走满，然后自己把播放器关掉。
+     ★ 同步加载，不加 defer：底下那段接线是内联的，defer 会让它跑在组件注册之前。 -->
+<script src="/mini-player.js"></script>
+<script>
+/* 挂载 ＋ 双向接线。播放状态只有一份（一起听那个 IIFE 里的 coAudio），
+   歌条只发意图、不碰音频，所以它和一起听页看到的永远是同一个状态。 */
+(function(){
+  const app = document.querySelector('.app');
+  if (!app || !window.customElements) return;
+
+  /* 第一次出现落在输入框上方，别压在聊天气泡上（组件自己默认的 y=240 正好压着）。
+     ★ 必须赶在 createElement 之前写：组件在 constructor 里就把 localStorage 读走了。
+     只在从来没存过的时候写；用户拖过一次之后，位置就归用户自己。 */
+  try {
+    if (!localStorage.getItem('lh.mp.pos')){
+      const ar = app.getBoundingClientRect();
+      const cmp = document.getElementById('composer');
+      const tabs = document.querySelector('.tabbar');
+      const low = (cmp && cmp.offsetHeight) ? cmp : tabs;
+      const gap = low ? (ar.bottom - low.getBoundingClientRect().top) : 140;
+      localStorage.setItem('lh.mp.pos', JSON.stringify({
+        y: Math.max(0, Math.round(ar.height - gap - 50 - 14)), side: 'right', mode: 'cd',
+      }));
+    }
+  } catch(e){}
+
+  const mp = document.createElement('mini-player');
+  mp.setAttribute('edge-pad', '12');
+  app.appendChild(mp);
+
+  /* 安全区别写死：顶栏和输入框的高度会变（输入框能收起、键盘会弹、底栏有没有 home indicator 也不一样）。
+     量的是「从 app 边到那样东西的距离」—— 底栏是 absolute 定位、还带着 safe-area 那一段，
+     输入框只在聊天页才显示，按距离量，谁显示谁隐藏都对。 */
+  function measure(){
+    const ar = app.getBoundingClientRect();
+    const top = document.querySelector('.top');
+    const cmp = document.getElementById('composer');
+    const tabs = document.querySelector('.tabbar');
+    let st = 64, sb = 140;
+    if (top && top.offsetHeight) st = top.getBoundingClientRect().bottom - ar.top;
+    /* 输入框显示着就以它为准（它在底栏上方）；没显示就退到底栏 */
+    const low = (cmp && cmp.offsetHeight) ? cmp : tabs;
+    if (low && low.offsetHeight) sb = ar.bottom - low.getBoundingClientRect().top;
+    mp.setAttribute('safe-top', Math.max(0, Math.round(st + 8)));
+    mp.setAttribute('safe-bottom', Math.max(0, Math.round(sb + 8)));
+  }
+  measure();
+  if (window.ResizeObserver){
+    const ro = new ResizeObserver(measure);
+    const cmp = document.getElementById('composer'); if (cmp) ro.observe(cmp);
+    const top = document.querySelector('.top');      if (top) ro.observe(top);
+    const tb  = document.querySelector('.tabbar');   if (tb)  ro.observe(tb);
+  }
+  /* 切页时输入框会整个显示/隐藏（.composer.on），那不是尺寸变化，ResizeObserver
+     不一定报得准 —— 盯着 class 再测一次。 */
+  if (window.MutationObserver){
+    const cmp = document.getElementById('composer');
+    if (cmp) new MutationObserver(measure).observe(cmp, {attributes: true, attributeFilter: ['class']});
+  }
+  window.addEventListener('resize', measure);
+
+  /* ── 歌条 → 一起听（只发意图，不碰音频）── */
+  const CO = () => window.CO || {};
+  mp.addEventListener('miniplayer:play',  () => { const c = CO(); c.play  && c.play(); });
+  mp.addEventListener('miniplayer:pause', () => { const c = CO(); c.pause && c.pause(); });
+  mp.addEventListener('miniplayer:next',  () => { const c = CO(); c.next  && c.next(); });
+  mp.addEventListener('miniplayer:prev',  () => { const c = CO(); c.prev  && c.prev(); });
+  mp.addEventListener('miniplayer:seek',  e => { const c = CO(); c.seek && c.seek(e.detail.ratio); });
+  /* 收起 ≠ 关掉：降档只是变小，歌照放 —— 这儿绝不去 pause。 */
+  mp.addEventListener('miniplayer:modechange', () => {});
+  /* 长按关掉＝停掉一起听。想再听，从一起听页进（那条路一直在）。 */
+  mp.addEventListener('miniplayer:closed', () => { const c = CO(); c.stop && c.stop(); });
+  /* 详情卡里那张方形封面 → 开一起听整页（搜索框和结果本来就在那儿，别再造一个） */
+  mp.addEventListener('miniplayer:pickersong', () => {
+    const pg = document.getElementById('colistenpage'); if (pg) pg.classList.add('on');
+  });
+
+  /* ── 一起听 → 歌条（音频那头的真实状态回灌）── */
+  function wire(){
+    const c = window.CO; if (!c || !c.audio) return false;
+    const a = c.audio;
+    a.addEventListener('timeupdate', () => mp.setProgress(a.currentTime));
+    a.addEventListener('play',  () => { mp.playing = true;  });
+    a.addEventListener('pause', () => { mp.playing = false; });
+    /* 搜歌接口不回时长，从音频自己身上拿 —— 最省的补法，后端一行不用改 */
+    a.addEventListener('loadedmetadata', () => {
+      if (a.duration && isFinite(a.duration)) mp.setTrack({duration: a.duration});
+    });
+    return true;
+  }
+  if (!wire()){ const t = setInterval(() => { if (wire()) clearInterval(t); }, 300); }
+
+  /* ── 给 playSong 用的入口 ── */
+  window.MP = {
+    el: mp,
+    take: function(song){
+      if (!song) return;
+      mp.setTrack({title: song.name || '', artist: song.artist || '', cover: song.cover || ''});
+      mp.setLyrics([]);
+      mp.setProgress(0);
+      mp.playing = true;
+      mp.open();
+    },
+    /* 一起听那边的 parseLrc 出的是 {t, txt}，组件要 {t, text} —— 在这儿转，别改那边 */
+    lyrics: function(lrc){
+      mp.setLyrics((lrc || []).map(x => ({t: x.t, text: x.txt || x.text || ''})));
+    },
+  };
 })();
 </script>

@@ -33,7 +33,7 @@ npm run dev          # = 构建 + python3 -m http.server 8425 --directory dist
 
 ## 构建做了什么（`scripts/build.mjs`）
 
-1. 白名单拷贝 `core/web/` 里的 `index.html`、`icons/`、`html2canvas.min.js`，和开屏那层水用的 `blocks/water/maple-water.js` 到 `dist/`；
+1. 白名单拷贝 `core/web/` 里的 `index.html`、`icons/`、`html2canvas.min.js`、`mini-player.js`，和开屏那层水用的 `blocks/water/maple-water.js` 到 `dist/`；
    **不拷 `sw.js` / `manifest.json`**——装一个指着错地方的 Service Worker 比不装糟得多。
 2. 只在副本上做纯文本替换（源文件一个字节不动），每处都断言命中次数，对不上就报错退出：
    补 `<!doctype html>` / `<html>` / `<head>` / `<body>`；删掉 `optional/` 里的颜文字样式表链接；
