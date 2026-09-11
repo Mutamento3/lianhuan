@@ -21,6 +21,7 @@
     "home/",
     "chat/",
     "call/",
+    "health/",
     "README.md",
     "LICENSE"
   ],
@@ -52,7 +53,9 @@
     "./call": "./call/call.js",
     "./call.css": "./call/call.css",
     "./glyph-ui": "./glyphcloud/glyph-ui.js",
-    "./glyph-ui.css": "./glyphcloud/glyph-ui.css"
+    "./glyph-ui.css": "./glyphcloud/glyph-ui.css",
+    "./health": "./health/health.js",
+    "./health.css": "./health/health.css"
   },
   "scripts": {
     "build": "node scripts/build.mjs",

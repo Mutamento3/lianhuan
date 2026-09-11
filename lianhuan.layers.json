@@ -519,6 +519,23 @@
         "blocks/call/call.css"
       ],
       "truth": "**不申请麦克风、不连任何服务、不伪造接通。** 只是界面和它的八个相位；真接线靠 `window.__call` 那套方法喂进来（方法名跟原项目一致）。demo 演的是一段编出来的剧本。那根线是 `frontend/thread`，没有复制第二份。"
+    },
+    "health": {
+      "label": "健康",
+      "summary": "一页看完今天：四个大数、心情、睡眠、周期；点进去看趋势，曲线能点能滑。",
+      "kind": "standalone",
+      "license": "MIT",
+      "requires": [
+        "frontend/tokens"
+      ],
+      "paths": [
+        "blocks/health"
+      ],
+      "imports": [
+        "blocks/health/health.js",
+        "blocks/health/health.css"
+      ],
+      "truth": "参考前端，零依赖，**不接任何数据源** —— 数据由宿主照 README 的格式喂进来；手机健康、快捷指令、手表各家口径不一样，这块不替你适配。应用里那个健康页是更早的一版，没有接这块。demo 里的数全是编的。"
     }
   },
   "profiles": {

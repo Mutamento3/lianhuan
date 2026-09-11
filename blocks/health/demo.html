@@ -1,0 +1,61 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>健康 · 参考前端 · demo</title>
+<link rel="stylesheet" href="../base/tokens.css">
+<link rel="stylesheet" href="health.css">
+<style>
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.7 system-ui,-apple-system,"PingFang SC","Hiragino Sans GB",sans-serif}
+  .wrap{max-width:440px;margin:0 auto;min-height:100vh;background:var(--bg);padding:0 16px 40px}
+  .eyebrow{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--hint);margin:22px 0 3px}
+  h2{font-size:21px;font-weight:700;margin:0 0 3px;letter-spacing:.01em}
+  .lede{font-size:13px;color:var(--sub);margin:2px 0 16px}
+  .packs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px}
+  .packs button{min-height:36px;padding:0 14px;border-radius:11px;background:var(--card);
+    border:1px solid var(--line);color:var(--sub);font:inherit;font-size:13px;cursor:pointer}
+  .packs button.on{border-color:var(--maple);color:var(--maple);background:var(--maple-soft);font-weight:600}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">health</div>
+  <h2>健康</h2>
+  <p class="lede">一页看完今天；点上面四个大数里任意一个，进趋势页（曲线能点，也能按住滑）。<br>
+    <b>这一页的数全是编的</b> —— 步数、睡眠、心率、心情、周期都是脚本用固定种子现生成的，
+    不对应任何真人。这块只画，不接任何数据源。</p>
+  <div class="packs">
+    <button data-demo="full" class="on">有数据</button>
+    <button data-demo="empty">空的</button>
+    <button data-theme-flip>亮 / 暗</button>
+  </div>
+  <div id="health"></div>
+</div>
+
+<script src="demo-data.js"></script>
+<script src="health.js"></script>
+<script>
+  var host = document.getElementById('health');
+  function mount(kind) {
+    var src = kind === 'empty' ? HEALTH_DEMO.empty : HEALTH_DEMO;
+    HealthPage(host, {
+      series: src.series,
+      now: src.now,
+      bio: HEALTH_DEMO.bio,
+      birthday: HEALTH_DEMO.birthday,
+      onSaveBio: function () { return true; }      /* demo 里只记在这一页，不存到哪儿去 */
+    });
+  }
+  mount('full');
+  document.querySelectorAll('[data-demo]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('[data-demo]').forEach(function (x) { x.classList.toggle('on', x === b); });
+      mount(b.getAttribute('data-demo'));
+    });
+  });
+  document.querySelector('[data-theme-flip]').addEventListener('click', function () {
+    var R = document.documentElement;
+    var dark = R.dataset.theme ? R.dataset.theme === 'dark'
+                               : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    R.dataset.theme = dark ? 'light' : 'dark';
+  });
+</script>

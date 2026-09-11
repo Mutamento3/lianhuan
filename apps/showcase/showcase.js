@@ -93,6 +93,12 @@
              "（一头连着的一道涌，另一头一串小齿），这个区别本身就是「现在轮到谁」。" +
              "AI 那一头在想的时候，线就在那头一笔写出一片叶子，笔走到哪儿＝想了多久。" +
              "不碰麦克风、不发请求：音量喂进来就用，不喂就走合成包络。" },
+
+    { id: "health", name: "健康", eyebrow: "Health", group: "page", kind: "real", demo: "health/demo.html",
+      pack: "frontend/health", imports: ["blocks/health/health.js", "blocks/health/health.css"],
+      truth: "一页看完今天：四个大数、心情、睡眠、周期；点四个大数进趋势页，曲线能点、能按住滑。" +
+             "只画，不接任何数据源 —— 手机健康、快捷指令、手表各家口径不一样，数据由你照它 README 的格式喂进来。" +
+             "这一页的数是编的，用固定种子现生成。" },
   ];
 
   var $ = function (s, r) { return (r || document).querySelector(s); };
