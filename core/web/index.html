@@ -6303,8 +6303,17 @@ const PREF = (function(){
       return order.indexOf(a) - order.indexOf(b);        /* 按屏幕上的先后排，不是勾选的先后 */
     });
     btn.disabled = true; btn.textContent = '出图…';
-    var done = function(t){ btn.disabled = false; btn.textContent = '存长图'; if (t) toast(t); };
+    /* 不管卡在哪一步，30 秒没动静就把按钮还回来，并说清停在哪儿（stage）——
+       不再一直停在「出图…」、什么都不报。晚到的图照样弹出来。 */
+    var stage = '拉出图脚本', over = false, dog = 0;
+    var done = function(t){ if (over) return; over = true; clearTimeout(dog);
+                            btn.disabled = false; btn.textContent = '存长图'; if (t) toast(t); };
+    dog = setTimeout(function(){
+      console.warn('[shot] 30 秒没动静，停在', stage);
+      done('出图卡在「' + stage + '」这一步，30 秒没动静');
+    }, 30000);
     loadH2C().then(function(h2c){
+      stage = '摆出要出图的那几条';
       var cs = getComputedStyle(document.body);
       var bg = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)'
              ? cs.backgroundColor : (getComputedStyle(document.documentElement)
@@ -6413,9 +6422,18 @@ const PREF = (function(){
       var _sc = Math.min(2, Math.sqrt(14000000 / Math.max(1, _w * _h)));
       if (!(_sc > 0.6)) _sc = 0.6;
       if (_sc < 2) console.warn('[shot] 图太长，倍数降到', _sc.toFixed(2));
-      return h2c(wrap, {backgroundColor: bg, scale: _sc, logging: false, useCORS: true})
+      stage = '画图';
+      /* 只克隆出图那一块。html2canvas 默认把整页克隆进一个 iframe，在 WebKit 上还要等克隆里
+         每一张图都加载完才动笔，而且会把 loading="lazy" 的图改成立刻加载 —— 没打开过的那些页里
+         懒加载的图全被逼着现下，有一张连不上就一直等。只带 wrap 和样式：出的图逐像素一样，快得多也省内存。 */
+      return h2c(wrap, {backgroundColor: bg, scale: _sc, logging: false, useCORS: true,
+                        ignoreElements: function(el){
+                          return el.parentNode === document.body && el !== wrap
+                                 && el.tagName !== 'STYLE' && el.tagName !== 'LINK';
+                        }})
         .then(function(cv){
           wrap.remove();
+          stage = '转成图片';
           return canvasBlob(cv);
         }, function(err){ wrap.remove(); throw err; });
     }).then(function(blob){
