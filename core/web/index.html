@@ -2602,6 +2602,20 @@ input[type=range]::-moz-range-thumb{
 /* 一键换重点色 */
 .swrow[hidden]{display:none}     /* 规矩 9：不补这条，隐藏了还占 27px＋一条分隔线（美化页有三行）*/
 .swrow{display:block;padding:13px 15px;border-bottom:1px solid var(--line)}
+/* [hidden] 会被上面那句 display:block 盖掉 —— 风 / 拖动 / 丝线颜色几行一直是靠 hidden 控显隐的，
+   不补这一句，它们其实从来没真隐藏过。 */
+.swrow[hidden], .setrow[hidden]{display:none}
+/* 「主页」底下那块展开区：高度从 0 拉到内容高（display:none 没法做过渡，所以用 height）。
+   「主页」这一排自己的底线去掉，跟展开区连成一块。 */
+.swrow[data-homerow]{border-bottom:0}
+.homeopts{height:0;overflow:hidden;transition:height .3s var(--e-out)}
+@media (prefers-reduced-motion:reduce){ .homeopts{transition:none} }
+.homeopts:empty{display:none}
+/* 六颗排法按钮原来 4+2 断行，纸夹和散摞孤零零掉第二行。3+3 均分，只限 #homepick。 */
+#homepick{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+#homepick button{width:100%}
+/* .swrow 里的 small 原来是行内的，直接贴在标题后面折行。照 .setrow 那边的写法补上。 */
+.swrow > div > span > small{display:block;margin-top:2px}
 /* ★ 0805 加到十二个色之后压成了椭圆：flex 子项默认 shrink:1，一行放不下就横着挤。
    跟交接里那条「不该压的一律 flex:none」是同一个病。给它们换行，别压。 */
 .swatches{display:flex;flex-wrap:wrap;gap:11px;padding:12px 0 2px 42px}
@@ -3804,7 +3818,6 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline-offset:1
       <div class="setgroup">
         <div class="eyebrow">美化</div>
         <div class="setlist">
-          <button class="setrow" data-sort><div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></svg></div><span>排一排主页<small>拖着换顺序，也能藏起来</small></span><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6l-6 6"/></svg></button>
           <div class="swrow">
             <div style="display:flex;align-items:center;gap:12px">
               <div class="ic" style="margin:0"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"/><path d="M13.5 6.5l4 4"/></svg></div>
@@ -3840,7 +3853,7 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline-offset:1
               <button data-tm="dark">夜</button>
             </div>
           </div>
-          <div class="swrow">
+          <div class="swrow" data-homerow>
             <div style="display:flex;align-items:center;gap:12px">
               <div class="ic" style="margin:0"><svg class="i" viewBox="0 0 24 24"><path d="M4 4l16 16"/><path d="M20 4l-16 16"/><path d="M12 3v18"/></svg></div>
               <span>主页<small>方块排着，还是挂在丝线上</small></span>
@@ -3854,6 +3867,32 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline-offset:1
               <button data-home-style="stack">散摞</button>
             </div>
           </div>
+
+          <!-- 跟主页排法有关的几行收在「主页」这一排底下，选中哪种排法才展开哪几行：
+               排一排只有方块有；拖动只有三种丝线排法有；风是会飘的几种才有（applyHome 里管）。
+               丝线颜色不进来 —— 它跟重点色是一类，每种排法都常驻。 -->
+          <div class="homeopts" data-homeopts><div class="homeopts-in">
+            <button class="setrow" data-sort data-sortrow hidden><div class="ic"><svg class="i" viewBox="0 0 24 24"><path d="M4 6l16 0"/><path d="M4 12l16 0"/><path d="M4 18l16 0"/></svg></div><span>排一排主页<small>拖着换顺序，也能藏起来</small></span><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6l-6 6"/></svg></button>
+            <div class="swrow" data-dragrow hidden>
+              <div style="display:flex;align-items:center;gap:12px">
+                <div class="ic" style="margin:0"><svg class="i" viewBox="0 0 24 24"><path d="M18 9l3 3l-3 3"/><path d="M15 12h6"/><path d="M6 9l-3 3l3 3"/><path d="M3 12h6"/><path d="M9 18l3 3l3 -3"/><path d="M12 15v6"/><path d="M15 6l-3 -3l-3 3"/><path d="M12 3v6"/></svg></div>
+                <span>拖动主页<small>卡片和线拖到哪儿挂哪儿 · 位置记在本机</small></span>
+              </div>
+              <!-- 0805 需求里说的：重置跟开关放一行，别自己占一行 -->
+              <div class="floatpick" data-dragsw>
+                <button data-drag="0" class="on">关</button>
+                <button data-drag="1">开</button>
+                <button data-reset style="margin-left:6px">重置线条</button>
+              </div>
+            </div>
+            <div class="swrow" data-windrow hidden>
+              <div style="display:flex;align-items:center;gap:12px">
+                <div class="ic" style="margin:0"><svg class="i" viewBox="0 0 24 24"><path d="M5 8h8.5a2.5 2.5 0 1 0 -2.34 -3.24"/><path d="M3 12h15.5a2.5 2.5 0 1 1 -2.34 3.24"/><path d="M4 16h5.5a2.5 2.5 0 1 1 -2.34 3.24"/></svg></div>
+                <span>风<small>丝线飘多大 · 纸被掀起来多深</small></span>
+              </div>
+              <input type="range" data-wind min="0" max="2.4" step="0.1" value="0.7" aria-label="风力">
+            </div>
+          </div></div>
 
           <!-- ══ 开屏 · 枫叶水面（0810）══
                0810 定的：小字全删（该知道的用户都知道了），滑杆照「漂浮物」那套 ——
@@ -3906,7 +3945,7 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline-offset:1
                档位（0~2.4、步长 .1、默认 0.7）和存的键（silk.wind / silk.pos.<排法>）一字未改，
                只把外壳换成 proto 这边的 .swrow ＋ .floatpick，好跟别的设置项长一样。
                风这一档丝线三版和纸夹、散摞一起吃；0.7 就是原始设计稿调好的那个手感。
-               这两行跟着排法开关（applyHome 里），方块排法下用不上就收起来。 -->
+               这几行现在收在「主页」那一排底下的展开区里，跟着选中的排法展开（applyHome 里）。 -->
           <!-- 丝线颜色：原始设计稿里就有的六选一，这一版一直没搬。
                「中性」＝跟着重点色走、只占三成，不跟强调色抢；挑了具体颜色就锁那个。
                灯串下不生效（那儿的线由灯光定色，原始设计稿里写死的规矩）。 -->
@@ -3928,25 +3967,6 @@ input:focus-visible,textarea:focus-visible,select:focus-visible{outline-offset:1
               <span>丝线颜色<small>中性＝跟着重点色走，不占强调色</small></span>
             </div>
             <div class="swatches" id="threadsw"></div>
-          </div>
-          <div class="swrow" data-windrow hidden>
-            <div style="display:flex;align-items:center;gap:12px">
-              <div class="ic" style="margin:0"><svg class="i" viewBox="0 0 24 24"><path d="M5 8h8.5a2.5 2.5 0 1 0 -2.34 -3.24"/><path d="M3 12h15.5a2.5 2.5 0 1 1 -2.34 3.24"/><path d="M4 16h5.5a2.5 2.5 0 1 1 -2.34 3.24"/></svg></div>
-              <span>风<small>丝线飘多大 · 纸被掀起来多深</small></span>
-            </div>
-            <input type="range" data-wind min="0" max="2.4" step="0.1" value="0.7" aria-label="风力">
-          </div>
-          <div class="swrow" data-dragrow hidden>
-            <div style="display:flex;align-items:center;gap:12px">
-              <div class="ic" style="margin:0"><svg class="i" viewBox="0 0 24 24"><path d="M18 9l3 3l-3 3"/><path d="M15 12h6"/><path d="M6 9l-3 3l3 3"/><path d="M3 12h6"/><path d="M9 18l3 3l3 -3"/><path d="M12 15v6"/><path d="M15 6l-3 -3l-3 3"/><path d="M12 3v6"/></svg></div>
-              <span>拖动主页<small>卡片和线拖到哪儿挂哪儿 · 位置记在本机</small></span>
-            </div>
-            <!-- 0805 需求里说的：重置跟开关放一行，别自己占一行 -->
-            <div class="floatpick" data-dragsw>
-              <button data-drag="0" class="on">关</button>
-              <button data-drag="1">开</button>
-              <button data-reset style="margin-left:6px">重置线条</button>
-            </div>
           </div>
           <div class="swrow">
             <div style="display:flex;align-items:center;gap:12px">
@@ -16335,6 +16355,8 @@ async function loadHome(){
   var boxStack=document.querySelector('[data-home="stack"]');
   var windRow=document.querySelector('[data-windrow]'), dragRow=document.querySelector('[data-dragrow]');
   var threadRow=document.querySelector('[data-threadrow]');
+  var sortRow=document.querySelector('[data-sortrow]');     /* 排一排：方块专有 */
+  var homeOpts=document.querySelector('[data-homeopts]');   /* 「主页」底下那块展开区 */
   var themeBefore=null;
   function applyHome(){
     /* 用 hidden 属性，别用 style.display —— 两个一起使会打架：
@@ -16357,6 +16379,22 @@ async function loadHome(){
     /* 风只有会飘的三种排法用得上；拖动是丝线独有的（纸夹和散摞的位置是用户钉死的几何） */
     if(windRow) windRow.hidden = (home==='tiles');
     if(dragRow) dragRow.hidden = !silkOn();
+    if(sortRow) sortRow.hidden = (home!=='tiles');   /* 排一排是方块专有 —— 别的排法没有「顺序」这回事 */
+    /* 展开区：内容换了要重新拉一次高度，不然停在上一个排法那儿。
+       ★ 归零这一下必须跳过 transition —— 不然它自己也被插值，读到的是动画中间值，
+         紧接着设回目标≈没变化，动画根本不播。
+       ★ 高度要下一帧再量：这一刻刚改完 hidden，布局还没重算。 */
+    if(homeOpts){
+      var anyRow = (sortRow && !sortRow.hidden) || (dragRow && !dragRow.hidden) || (windRow && !windRow.hidden);
+      var inner = homeOpts.querySelector('.homeopts-in');
+      homeOpts.style.transition = 'none';
+      homeOpts.style.height = '0px';
+      void homeOpts.offsetHeight;
+      homeOpts.style.transition = '';
+      requestAnimationFrame(function(){
+        homeOpts.style.height = (anyRow && inner) ? inner.scrollHeight + 'px' : '0px';
+      });
+    }
     /* 灯串下线由灯光定色，挑颜色不生效 —— 原始设计稿里的规矩，那就干脆别摆出来 */
     if(threadRow) threadRow.hidden = !silkOn() || home==='lantern';
     applyThread();
