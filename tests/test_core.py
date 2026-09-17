@@ -417,6 +417,7 @@ class TestEngawaIntegration(unittest.TestCase):
         try:
             state = next(packs._state(p) for p in packs.PACKS if p["id"] == "engawa")
             self.assertIn("电脑", state["setup_blocked"])
+            self.assertIn("python3 scripts/setup-engawa.py", state["setup_blocked"])   # 装不了也说怎么装
             app = FastAPI()
             app.include_router(packs.router)
             r = TestClient(app).post("/api/packs/engawa/setup")
@@ -443,11 +444,16 @@ class TestEngawaIntegration(unittest.TestCase):
             else:
                 _os.environ["LIANHUAN_CONTAINER"] = old_c
         self.assertEqual("", packs._setup_blocked())
+        state = next(packs._state(p) for p in packs.PACKS if p["id"] == "engawa")
+        for must in ("localhost", "python3 scripts/setup-engawa.py", "重启连环"):   # 电脑和云服务器两条都在
+            self.assertIn(must, state["setup_remote"])
         docker = (Path(__file__).resolve().parent.parent / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn("LIANHUAN_CONTAINER=1", docker)   # 一键部署和 compose 都走这份
         h = (Path(__file__).resolve().parent.parent / APP()).read_text(encoding="utf-8")
         self.assertIn("p.setup_blocked ||", h)       # 页面：装不了就不摆按钮
         self.assertIn("if (away) btns = ", h)        # 也不留「点下面安装即可」
+        self.assertIn("p.setup_remote", h)            # 别处打开：用服务器那份话
+        self.assertIn(".pkaway{white-space:pre-line}", h)
         self.assertIn("pkwhy", h)                    # 页面：装失败把原话摊出来
 
 

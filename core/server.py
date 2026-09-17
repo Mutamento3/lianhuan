@@ -126,9 +126,8 @@ async def _gate_mw(request: Request, call_next):
         # 从手机、别的电脑点「安装」的人要的是一句能照着做的话，不是一条规矩
         msg = "这条只能在明确允许的本机页面使用 —— 它会起一个进程。"
         if not here and path.endswith("/setup"):
-            from .packs import _setup_blocked
-            msg = _setup_blocked() or ("安装要在装着连环的那台电脑上、用它自己的浏览器点 —— "
-                                       "手机和别的设备点不了，因为这一步是在那台电脑上装程序。")
+            from .packs import _setup_blocked, SETUP_REMOTE
+            msg = _setup_blocked() or SETUP_REMOTE
         return _secured(JSONResponse({"error": msg}, status_code=403))
 
     # ② 没开 --lan → 照旧；开了之后连 127.0.0.1 也必须报门（它可能是反代）。

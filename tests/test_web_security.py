@@ -139,6 +139,7 @@ class TestHttpBoundary(unittest.TestCase):
         setup = _request("POST", "/api/packs/engawa/setup", body=b"{}", headers=hdrs, client="192.168.1.20")
         self.assertEqual(403, setup["status"])
         self.assertIn("那台电脑", json.loads(setup["body"])["error"])
+        self.assertIn("python3 scripts/setup-engawa.py", json.loads(setup["body"])["error"])   # 云服务器那条
         other = _request("POST", "/api/mcp/add", body=b"{}", headers=hdrs, client="192.168.1.20")
         self.assertEqual(403, other["status"])
         self.assertIn("本机页面", json.loads(other["body"])["error"])

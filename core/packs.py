@@ -269,18 +269,34 @@ PACKS = [
 ]
 
 
+#: 两条装法。设置页、闸、下面三种「装不了」说的都是这一份；docs/FEATURES.md 那张表照着它写。
+_HOW = ("· 连环在家里的电脑上：到那台电脑上，用它自己的浏览器打开连环（地址以 localhost 或 127.0.0.1 开头），"
+        "进「设置 › 功能包」，点「安装 Engawa」\n"
+        "· 连环在自己的云服务器上（不用 Docker、直接跑的）：登录服务器，进连环的文件夹，"
+        "运行 python3 scripts/setup-engawa.py，装好后重启连环")
+
+#: 用手机或别的设备打开时：连环跑在另一台机器上，这里不能点。
+#: ★ 云服务器一般没有浏览器，所以不能只说「去那台电脑上点」，终端那条也要写出来。
+SETUP_REMOTE = ("这一页不是在跑着连环的那台机器上打开的，所以这里不能点安装 —— "
+                "安装是往那台机器里装一个程序，只能在它本机上做。可以这样装：\n" + _HOW +
+                "\n装好以后，用手机打开连环也能用上 Engawa。")
+
+
 def _setup_blocked() -> str:
-    """一键安装器要在这台机器上装一个程序、再把它跑起来。浏览器版（Python 跑在网页里）
-    和安卓完整体都做不到 —— 回一句人话；做得到回空串。
-    ★ 以前这两处照样显示「安装」按钮，点了必失败，报的错还看不懂（苹果手机只能用浏览器版）。"""
+    """一键安装器要在这台机器上装一个程序、再把它跑起来。浏览器版（Python 跑在网页里）、
+    一键部署和 Docker（装进容器，重新部署就没了）、安卓完整体都做不到 ——
+    回「为什么装不了」加两条装法；做得到回空串。
+    ★ 以前这几处照样显示「安装」按钮，点了必失败，报的错还看不懂（苹果手机只能用浏览器版）。"""
     if sys.platform in ("emscripten", "wasi"):
-        return "浏览器版装不了：它整个跑在网页里，没法在手机或电脑上另装程序。要在电脑上装好连环，再在那台电脑上点安装"
-    if os.environ.get("LIANHUAN_CONTAINER"):
-        return ("云上（Render、Koyeb）或 Docker 里跑的连环装不了 Engawa：它要装在一台你自己的电脑上。"
-                "想用的话，在电脑上装一份连环，再在那台电脑上点安装")
-    if os.environ.get("LIANHUAN_ANDROID_TOKEN"):
-        return "安卓完整体装不了：手机上没法另装这个程序。要在电脑上装好连环，再在那台电脑上点安装"
-    return ""
+        why = "浏览器版装不了 Engawa：连环整个跑在这个网页里，网页没法往手机或电脑里装程序。"
+    elif os.environ.get("LIANHUAN_CONTAINER"):
+        why = ("一键部署到云上（Render、Koyeb）或用 Docker 跑的连环装不了 Engawa："
+               "它只能装进容器里，重新部署一次就没了。")
+    elif os.environ.get("LIANHUAN_ANDROID_TOKEN"):
+        why = "安卓完整体装不了 Engawa：手机上没法另装这个程序。"
+    else:
+        return ""
+    return why + "\n想用的话，先把连环装在家里的电脑或自己的云服务器上，再在那台机器上装：\n" + _HOW
 
 
 def _setup_failure(done) -> dict:
@@ -307,6 +323,7 @@ def _state(p) -> dict:
     if p.get("setup"):
         out["setup"] = True
         out["setup_label"] = p.get("setup_label") or "安装"
+        out["setup_remote"] = SETUP_REMOTE     # 页面发现自己不是在本机打开时用
         blocked = _setup_blocked()
         if blocked:
             out["setup_blocked"] = blocked

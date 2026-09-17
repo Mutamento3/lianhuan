@@ -44,6 +44,7 @@
 .pklang .pklb{font-size:11.5px;color:var(--hint);margin-bottom:7px}
 .pklang small{display:block;margin-top:8px;font-size:11.5px;line-height:1.7;color:var(--sub)}
 .pkmiss{font-size:12px;line-height:1.7;color:var(--hint);margin:0 0 8px}
+.pkaway{white-space:pre-line}
 .pkwhy{margin:8px 0 0;padding:10px 12px;max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--hint);background:var(--card2);border:1px solid var(--line);border-radius:10px;-webkit-user-select:text;user-select:text}
 /* ══ 记忆字云（0827）══════════════════════════════════════════════════
    记忆库可视化的设计出自本项目，上游作者帮着完善了实现，这边接的是真记忆。
@@ -17093,9 +17094,9 @@ async function loadHome(){
           /* ★ 装不了的地方不摆「安装」—— 浏览器版（苹果手机只能用它）、安卓完整体、
                从手机或别的设备打开的页面，点了必失败。直接说要去哪儿装。 */
           var away = p.setup_blocked || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) ? ''
-            : '要在装着连环的那台电脑上，用它自己的浏览器打开这一页（地址以 localhost 或 127.0.0.1 开头）再点安装');
+            : (p.setup_remote || '这一页不是在跑着连环的那台机器上打开的，所以这里不能点安装'));
           /* ★ 装不了的时候连「缺：…点下面安装即可」那行也换掉 —— 下面没有按钮，两句会打架 */
-          if (away) btns = '<div class="pkmiss">'+esc(away)+'</div>';
+          if (away) btns = '<div class="pkmiss pkaway">'+esc(away)+'</div>';
           else btns += '<button class="pkbtn main" data-pk-setup="'+esc(p.id)+'">'+esc(p.setup_label||'安装')+'</button>';
         } else if ((p.keys||[]).length){
           /* ★ 0901 反馈：这几个格子看不懂。原来五个一模一样的密码框排一列，

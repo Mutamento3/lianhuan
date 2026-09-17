@@ -69,7 +69,8 @@
 
 | 看到的 | 怎么办 |
 |---|---|
-| 没有「安装」按钮，写着要去电脑上装 | 浏览器版、安卓完整体、云上（Render / Koyeb）或 Docker 里跑的，还有从手机或别的设备打开的页面，都装不了（苹果手机只能用浏览器版，所以也装不了）。在装着连环的那台电脑上，用它自己的浏览器打开（地址以 `localhost` 或 `127.0.0.1` 开头）再点 |
+| 没有「安装」按钮，写着这一页不是在那台机器上打开的 | 用手机或别的设备打开连环时会这样：安装只能在跑着连环的那台机器本机上做。连环在家里的电脑上：到那台电脑上，用它自己的浏览器打开（地址以 `localhost` 或 `127.0.0.1` 开头），进「设置 › 功能包」点「安装 Engawa」。连环在自己的云服务器上（不用 Docker、直接跑的）：登录服务器，进连环的文件夹，运行 `python3 scripts/setup-engawa.py`，装好后重启连环。装好以后，手机上也能用 |
+| 没有「安装」按钮，写着这里装不了 | 浏览器版（苹果手机只能用这个）、安卓完整体、一键部署到云上（Render / Koyeb）或用 Docker 跑的，都装不了。先把连环装在家里的电脑或自己的云服务器上，再照上一行装 |
 | 要 Python 3.11 或更新版本 | 装一个新的 Python，再点一次 |
 | 下载没成功（国内网络常见） | 在连环目录里换国内的包镜像装：`PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple python3 scripts/setup-engawa.py` |
 | 连不上 GitHub | 先用浏览器下载 `https://github.com/tsuru0805/engawa-mcp/archive/<提交号>.zip`（提交号是 `upstreams/engawa-mcp.lock.json` 里的 `commit`），再运行 `ENGAWA_SOURCE=下载好的压缩包路径 python3 scripts/setup-engawa.py` |
