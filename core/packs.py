@@ -275,6 +275,9 @@ def _setup_blocked() -> str:
     ★ 以前这两处照样显示「安装」按钮，点了必失败，报的错还看不懂（苹果手机只能用浏览器版）。"""
     if sys.platform in ("emscripten", "wasi"):
         return "浏览器版装不了：它整个跑在网页里，没法在手机或电脑上另装程序。要在电脑上装好连环，再在那台电脑上点安装"
+    if os.environ.get("LIANHUAN_CONTAINER"):
+        return ("云上（Render、Koyeb）或 Docker 里跑的连环装不了 Engawa：它要装在一台你自己的电脑上。"
+                "想用的话，在电脑上装一份连环，再在那台电脑上点安装")
     if os.environ.get("LIANHUAN_ANDROID_TOKEN"):
         return "安卓完整体装不了：手机上没法另装这个程序。要在电脑上装好连环，再在那台电脑上点安装"
     return ""

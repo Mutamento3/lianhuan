@@ -17094,8 +17094,9 @@ async function loadHome(){
                从手机或别的设备打开的页面，点了必失败。直接说要去哪儿装。 */
           var away = p.setup_blocked || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) ? ''
             : '要在装着连环的那台电脑上，用它自己的浏览器打开这一页（地址以 localhost 或 127.0.0.1 开头）再点安装');
-          btns += away ? '<div class="pkmiss">'+esc(away)+'</div>'
-            : '<button class="pkbtn main" data-pk-setup="'+esc(p.id)+'">'+esc(p.setup_label||'安装')+'</button>';
+          /* ★ 装不了的时候连「缺：…点下面安装即可」那行也换掉 —— 下面没有按钮，两句会打架 */
+          if (away) btns = '<div class="pkmiss">'+esc(away)+'</div>';
+          else btns += '<button class="pkbtn main" data-pk-setup="'+esc(p.id)+'">'+esc(p.setup_label||'安装')+'</button>';
         } else if ((p.keys||[]).length){
           /* ★ 0901 反馈：这几个格子看不懂。原来五个一模一样的密码框排一列，
              唯一的区别写在 placeholder 里 —— 而 placeholder **一打字就没了**，

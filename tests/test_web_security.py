@@ -142,6 +142,13 @@ class TestHttpBoundary(unittest.TestCase):
         other = _request("POST", "/api/mcp/add", body=b"{}", headers=hdrs, client="192.168.1.20")
         self.assertEqual(403, other["status"])
         self.assertIn("本机页面", json.loads(other["body"])["error"])
+        os.environ["LIANHUAN_CONTAINER"] = "1"      # 云上 / Docker：没有「那台电脑」可去
+        try:
+            cloud = _request("POST", "/api/packs/engawa/setup", body=b"{}", headers=hdrs, client="10.0.0.7")
+            self.assertEqual(403, cloud["status"])
+            self.assertIn("云上", json.loads(cloud["body"])["error"])
+        finally:
+            os.environ.pop("LIANHUAN_CONTAINER", None)
 
     def test_armed_gate_never_bypasses_loopback_and_secure_cookie_is_set(self):
         self.gate.arm("a-long-enough-passphrase")

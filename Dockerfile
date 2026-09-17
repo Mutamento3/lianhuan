@@ -10,7 +10,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN mkdir -p /app/data
+# LIANHUAN_CONTAINER：设置页据此不摆「安装 Engawa」—— 容器里起的程序装不进你自己的电脑
 ENV PORT=8420 \
+    LIANHUAN_CONTAINER=1 \
     LIANHUAN_DB=/app/data/lianhuan.db \
     PYTHONUNBUFFERED=1
 EXPOSE 8420

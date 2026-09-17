@@ -433,9 +433,21 @@ class TestEngawaIntegration(unittest.TestCase):
             self.assertIn("浏览器版", packs._setup_blocked())
         finally:
             packs.sys = real_sys
+        old_c = _os.environ.get("LIANHUAN_CONTAINER")
+        _os.environ["LIANHUAN_CONTAINER"] = "1"
+        try:
+            self.assertIn("云上", packs._setup_blocked())
+        finally:
+            if old_c is None:
+                _os.environ.pop("LIANHUAN_CONTAINER", None)
+            else:
+                _os.environ["LIANHUAN_CONTAINER"] = old_c
         self.assertEqual("", packs._setup_blocked())
+        docker = (Path(__file__).resolve().parent.parent / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("LIANHUAN_CONTAINER=1", docker)   # 一键部署和 compose 都走这份
         h = (Path(__file__).resolve().parent.parent / APP()).read_text(encoding="utf-8")
         self.assertIn("p.setup_blocked ||", h)       # 页面：装不了就不摆按钮
+        self.assertIn("if (away) btns = ", h)        # 也不留「点下面安装即可」
         self.assertIn("pkwhy", h)                    # 页面：装失败把原话摊出来
 
 
