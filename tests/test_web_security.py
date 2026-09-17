@@ -134,6 +134,15 @@ class TestHttpBoundary(unittest.TestCase):
             ("content-type", "text/plain"), ("origin", "http://lianhuan.test")))
         self.assertEqual(415, plain["status"])
 
+    def test_setup_from_another_device_says_where_to_click(self):
+        hdrs = (("content-type", "application/json"), ("origin", "http://lianhuan.test"))
+        setup = _request("POST", "/api/packs/engawa/setup", body=b"{}", headers=hdrs, client="192.168.1.20")
+        self.assertEqual(403, setup["status"])
+        self.assertIn("那台电脑", json.loads(setup["body"])["error"])
+        other = _request("POST", "/api/mcp/add", body=b"{}", headers=hdrs, client="192.168.1.20")
+        self.assertEqual(403, other["status"])
+        self.assertIn("本机页面", json.loads(other["body"])["error"])
+
     def test_armed_gate_never_bypasses_loopback_and_secure_cookie_is_set(self):
         self.gate.arm("a-long-enough-passphrase")
         self.assertEqual(401, _request(path="/api/memories")["status"])

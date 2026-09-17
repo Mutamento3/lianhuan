@@ -269,6 +269,34 @@ PACKS = [
 ]
 
 
+def _setup_blocked() -> str:
+    """一键安装器要在这台机器上装一个程序、再把它跑起来。浏览器版（Python 跑在网页里）
+    和安卓完整体都做不到 —— 回一句人话；做得到回空串。
+    ★ 以前这两处照样显示「安装」按钮，点了必失败，报的错还看不懂（苹果手机只能用浏览器版）。"""
+    if sys.platform in ("emscripten", "wasi"):
+        return "浏览器版装不了：它整个跑在网页里，没法在手机或电脑上另装程序。要在电脑上装好连环，再在那台电脑上点安装"
+    if os.environ.get("LIANHUAN_ANDROID_TOKEN"):
+        return "安卓完整体装不了：手机上没法另装这个程序。要在电脑上装好连环，再在那台电脑上点安装"
+    return ""
+
+
+def _setup_failure(done) -> dict:
+    """安装器没装完时，把它自己说的原因和最后几行原话交给页面。
+    认不出标记（比如还没走到那儿就崩了）就给输出的最后一截，至少不是一句空话。"""
+    err = done.stderr or ""
+    reason, raw = "", ""
+    mark = err.rfind("安装没完成：")
+    if mark >= 0:
+        rest = err[mark + len("安装没完成："):]
+        reason, _, raw = rest.partition("—— 最后几行原话 ——")
+        reason, raw = reason.strip(), raw.strip()
+    if not raw:
+        raw = "\n".join(((done.stdout or "") + "\n" + err).strip().splitlines()[-25:])
+    return {"error": "安装没有完成：" + reason if reason
+            else "安装没有完成；可以在终端运行 python3 scripts/setup-engawa.py 看详情",
+            "detail": raw[-3000:]}
+
+
 def _state(p) -> dict:
     out = {"id": p["id"], "name": p["name"], "desc": p["desc"], "kind": p["kind"],
            "contract": p.get("contract", ""),
@@ -276,6 +304,9 @@ def _state(p) -> dict:
     if p.get("setup"):
         out["setup"] = True
         out["setup_label"] = p.get("setup_label") or "安装"
+        blocked = _setup_blocked()
+        if blocked:
+            out["setup_blocked"] = blocked
     if p.get("connected") and p["connected"]():
         out["state"] = "on"
     elif p["kind"] == "builtin":
@@ -332,6 +363,9 @@ async def setup_pack(pid: str):
     p = next((x for x in PACKS if x["id"] == pid), None)
     if p is None or not p.get("setup"):
         return JSONResponse({"error": "这个包没有一键安装器"}, status_code=404)
+    blocked = _setup_blocked()
+    if blocked:
+        return JSONResponse({"error": blocked}, status_code=400)
     script = Path(__file__).resolve().parent.parent / p["setup"]
     try:
         done = await __import__("asyncio").to_thread(
@@ -339,8 +373,7 @@ async def setup_pack(pid: str):
             capture_output=True, text=True, timeout=600,
         )
         if done.returncode:
-            return JSONResponse({"error": "安装没有完成；请在终端运行 python3 scripts/setup-engawa.py 看详情"},
-                                status_code=500)
+            return JSONResponse(_setup_failure(done), status_code=500)
         result = p["enable"]()
         if inspect.isawaitable(result):
             await result

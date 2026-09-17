@@ -123,8 +123,12 @@ async def _gate_mw(request: Request, call_next):
 
     # ① 命令执行类：认证过也不给外面用。密码会泄，起进程不给第二次机会。
     if _gate.command_path(path) and (not here or (_gate.on() and not _gate.allow_local_commands())):
-        return _secured(JSONResponse({"error": "这条只能在明确允许的本机页面使用 —— 它会起一个进程。"},
-                                     status_code=403))
+        # 从手机、别的电脑点「安装」的人要的是一句能照着做的话，不是一条规矩
+        msg = ("安装要在装着连环的那台电脑上、用它自己的浏览器点 —— 手机和别的设备点不了，"
+               "因为这一步是在那台电脑上装程序。"
+               if not here and path.endswith("/setup")
+               else "这条只能在明确允许的本机页面使用 —— 它会起一个进程。")
+        return _secured(JSONResponse({"error": msg}, status_code=403))
 
     # ② 没开 --lan → 照旧；开了之后连 127.0.0.1 也必须报门（它可能是反代）。
     if not _gate.on():

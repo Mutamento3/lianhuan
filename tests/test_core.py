@@ -331,6 +331,113 @@ class TestEngawaIntegration(unittest.TestCase):
         self.assertIn("/api/engawa/action", h)
         self.assertIn('data-pk-setup="', h)
 
+    def _installer(self):
+        import importlib.util
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location("setup_engawa", root / "scripts/setup-engawa.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_installer_source_keeps_git_falls_back_to_zip_and_takes_a_manual_file(self):
+        mod = self._installer()
+        root = Path(__file__).resolve().parent.parent
+        lock = json.loads((root / "upstreams/engawa-mcp.lock.json").read_text(encoding="utf-8"))
+        old = _os.environ.pop("ENGAWA_SOURCE", None)
+        try:
+            mod.git_works = lambda: True       # 有 git：跟以前一字不差
+            self.assertEqual("git+https://github.com/tsuru0805/engawa-mcp.git@" + lock["commit"],
+                             mod.source(lock))
+            mod.git_works = lambda: False      # 没有能用的 git：同一个提交的压缩包
+            self.assertEqual("https://github.com/tsuru0805/engawa-mcp/archive/" + lock["commit"] + ".zip",
+                             mod.source(lock))
+            _os.environ["ENGAWA_SOURCE"] = "/tmp/engawa-by-hand.zip"   # 手动下好的优先
+            self.assertEqual("/tmp/engawa-by-hand.zip", mod.source(lock))
+        finally:
+            _os.environ.pop("ENGAWA_SOURCE", None)
+            if old is not None:
+                _os.environ["ENGAWA_SOURCE"] = old
+
+    def test_installer_names_the_common_failures(self):
+        mod = self._installer()
+        net = "WARNING: Retrying after connection broken by 'NewConnectionError: Failed to establish a new connection'"
+        self.assertIn("镜像", mod.why("pip", net))
+        self.assertIn("git", mod.why("pip", "ERROR: Cannot find command 'git' - do you have 'git' installed?"))
+        self.assertIn("python3-venv", mod.why("venv", "Error: ensurepip is not available"))
+        self.assertEqual("", mod.why("pip", "a failure nobody has seen before"))
+
+    def test_installer_failure_prints_the_reason_before_the_raw_lines(self):
+        import contextlib
+        import io
+        mod = self._installer()
+
+        def boom():
+            raise mod.SetupError("测试原因", "第一行\n最后一行")
+
+        mod.install = boom
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(1, mod.main())
+        text = err.getvalue()
+        self.assertIn(mod.REASON + "测试原因", text)
+        self.assertLess(text.index(mod.REASON), text.index(mod.RAW))
+        self.assertIn("最后一行", text)
+
+    def test_setup_failure_reaches_the_page_with_reason_and_raw_lines(self):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from core import packs
+        with tempfile.TemporaryDirectory() as d:
+            script = Path(d) / "failing-setup.py"
+            script.write_text("import sys\n"
+                              "print('装到一半')\n"
+                              "print('\\n安装没完成：测试原因', file=sys.stderr)\n"
+                              "print('—— 最后几行原话 ——\\n原话甲\\n原话乙', file=sys.stderr)\n"
+                              "sys.exit(1)\n", encoding="utf-8")
+            fake = {"id": "fake-setup", "name": "测试", "desc": "测试", "kind": "real",
+                    "check": lambda: ["还没装"], "enable": lambda: None, "setup": str(script)}
+            packs.PACKS.append(fake)
+            try:
+                app = FastAPI()
+                app.include_router(packs.router)
+                r = TestClient(app).post("/api/packs/fake-setup/setup")
+                self.assertEqual(500, r.status_code)
+                self.assertEqual("安装没有完成：测试原因", r.json()["error"])
+                self.assertIn("原话乙", r.json()["detail"])
+            finally:
+                packs.PACKS.remove(fake)
+
+    def test_setup_is_not_offered_where_it_cannot_run(self):
+        import types
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from core import packs
+        old = _os.environ.get("LIANHUAN_ANDROID_TOKEN")
+        _os.environ["LIANHUAN_ANDROID_TOKEN"] = "test-only"
+        try:
+            state = next(packs._state(p) for p in packs.PACKS if p["id"] == "engawa")
+            self.assertIn("电脑", state["setup_blocked"])
+            app = FastAPI()
+            app.include_router(packs.router)
+            r = TestClient(app).post("/api/packs/engawa/setup")
+            self.assertEqual(400, r.status_code)
+            self.assertIn("电脑", r.json()["error"])
+        finally:
+            if old is None:
+                _os.environ.pop("LIANHUAN_ANDROID_TOKEN", None)
+            else:
+                _os.environ["LIANHUAN_ANDROID_TOKEN"] = old
+        real_sys = packs.sys
+        packs.sys = types.SimpleNamespace(platform="emscripten", executable=real_sys.executable)
+        try:
+            self.assertIn("浏览器版", packs._setup_blocked())
+        finally:
+            packs.sys = real_sys
+        self.assertEqual("", packs._setup_blocked())
+        h = (Path(__file__).resolve().parent.parent / APP()).read_text(encoding="utf-8")
+        self.assertIn("p.setup_blocked ||", h)       # 页面：装不了就不摆按钮
+        self.assertIn("pkwhy", h)                    # 页面：装失败把原话摊出来
+
 
 class TestJobs(unittest.IsolatedAsyncioTestCase):
     async def test_echo_runs_to_completion(self):
